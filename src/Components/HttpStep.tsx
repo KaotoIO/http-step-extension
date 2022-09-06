@@ -114,7 +114,7 @@ const HttpStep = (props: any) => {
 
     function isSource(): boolean {
         const name: string = props.step?.name.toString();
-        return !name?.includes('source');
+        return name?.includes('source');
     }
 
     const handleFileInputChange = (
@@ -145,7 +145,7 @@ const HttpStep = (props: any) => {
         setOpenApiSpecText('');
     };
 
-    function setValue() {
+    function updateKaoto() {
         props.notifyKaoto(
             'Http step updated'
         );
@@ -160,8 +160,7 @@ const HttpStep = (props: any) => {
     const handleLoadClick = () => {
         let url = new URL(apiSpecUrl);
         parseSpec(apiSpecUrl).catch(console.error);
-
-        constructUrl('',url.origin);
+        constructUrl('', url.origin);
     };
 
     const constructUrl = (urParameters: string, bPath?: string) => {
@@ -176,26 +175,11 @@ const HttpStep = (props: any) => {
         setStepParams(stepParamsTemp);
     };
 
-    function updatePeriod(period: number) {
-        setStepParams(prevState => ({
-            ...prevState,
-            period: period,
-        }));
-    }
-
-    const setContentType = (produces: string) => {
-        //causes problems
-        setStepParams(prevState => ({
-            ...prevState,
-            contentType: produces
-        }));
-    }
-
     function updateStepParams(url: string, contentType: string, period: number) {
         const newStepParams: HttpStepParams = {
             period: (period > 0 ? period : stepParams.period),
             url: (url !== '' ? url : stepParams.url),
-           contentType: (contentType!==''?contentType:stepParams.contentType),
+            contentType: (contentType !== '' ? contentType : stepParams.contentType),
         };
         setStepParams(newStepParams);
     }
@@ -258,23 +242,29 @@ const HttpStep = (props: any) => {
                     endpoint={currentEndpoint}
                     isSource={isSource()}
                     setUrl={constructUrl}
-                    setContentType={setContentType}
+                    setContentType={(contentType: string) => {
+                        updateStepParams('', contentType, 0)
+                    }}
                 />
             )}
 
             {isSource() &&
                 <TimePeriodSelect initTimeUnit={initTimeUnit} initPeriodInputValue={initPeriodINputValue}
-                                  setTimePeriod={updatePeriod}/>
+                                  setTimePeriod={(period: number) => {
+                                      updateStepParams('', '', period)
+                                  }}/>
             }
 
             <FormGroup label="URL">
-                <TextInput value={stepParams.url} isReadOnly aria-label="url-read-only"/>
+                <TextInput onChange={(value) => updateStepParams(value, '', 0)}
+                           value={stepParams.url} aria-label="url-read-only"/>
             </FormGroup>
             <FormGroup label="Content Type">
-                <TextInput value={stepParams.contentType} aria-label="url-read-only"/>
+                <TextInput onChange={(value) => updateStepParams('', value, 0)}
+                           value={stepParams.contentType} aria-label="url-read-only"/>
             </FormGroup>
             <ActionGroup>
-                <Button variant="primary" onClick={setValue}>
+                <Button variant="primary" onClick={updateKaoto}>
                     Apply
                 </Button>
             </ActionGroup>

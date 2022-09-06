@@ -63,7 +63,7 @@ module.exports = () => {
         name: 'httpStep',
         filename: 'remoteEntry.js',
         exposes: {
-          './HttpStep': './src/HttpStep',
+          './HttpStep': './src/Components/HttpStep',
         },
         shared: {
           ...dependencies,

@@ -9,11 +9,10 @@ import {
     TextInput,
 } from '@patternfly/react-core';
 import {OpenAPI} from 'openapi-types';
-import {ReactElement, useRef, useState} from 'react';
+import {ReactElement, useEffect, useRef, useState} from 'react';
 
 const ParamFields = ({parameters, handleChange}) => {
     const fieldList: ReactElement[] = [];
-
     parameters.forEach((v, name, index) => {
         fieldList.push(
             <FormGroup key={'key' + name + index} label={name} fieldId={'id' + name}>
@@ -24,7 +23,7 @@ const ParamFields = ({parameters, handleChange}) => {
                     id={'idTextInput-' + name}
                     name={'nameTextInput' + name}
                     //
-                    onChange={(value, event) => {
+                    onChange={(value) => {
                         handleChange(name, value);
                     }}
                 />
@@ -48,9 +47,8 @@ export type HttpEndpointProps = {
 };
 
 export const HttpEndpoint = (props: HttpEndpointProps) => {
-    const [initMethod] = props.endpoint.operations.keys();
-    const [isOpen, setIsOpen] = useState(false);
-    const [currentOperation, setCurrentOperation] = useState(initMethod);
+    const [initOperationName] = props.endpoint.operations.keys();
+    const [currentOperation, setCurrentOperation] = useState<string>(initOperationName);
     const parameters = useRef<Map<string, string>>(new Map());
     const [currentContentType, setCurrentContentType] = useState<string>('');
 
@@ -67,10 +65,10 @@ export const HttpEndpoint = (props: HttpEndpointProps) => {
         return props.endpoint.operations.get(name);
     }
 
-  //  props.setUrl(props.endpoint.name);
+    //  props.setUrl(props.endpoint.name);
     function getParameters(method?: OpenAPI.Operation): Map<string, string> {
         const parameters: Map<string, string> = new Map<string, string>();
-        //
+
         method?.parameters?.forEach((v) => {
             parameters.set(v.name, '');
         });
@@ -87,27 +85,16 @@ export const HttpEndpoint = (props: HttpEndpointProps) => {
         return found;
     }
 
-    function selectMethod(name: string) {
+    function selectOperation(name: string) {
         const params: Map<string, string> = getParameters(getOperation(name));
         parameters.current = new Map(params);
         setCurrentOperation(name);
-        setIsOpen(false);
     }
-
-    const onToggle = (isOpen: boolean) => {
-        setIsOpen(isOpen);
-    };
 
     const dropdownOperationItems: Array<ReactElement> = [];
     props.endpoint.operations.forEach((v, method) => {
         dropdownOperationItems.push(
-            <DropdownItem
-                key={method}
-                onClick={() => {
-                    selectMethod(method);
-                }}>
-                {method}
-            </DropdownItem>
+            <FormSelectOption label={method} key={method} value={method}/>
         );
     });
 
@@ -147,28 +134,20 @@ export const HttpEndpoint = (props: HttpEndpointProps) => {
         return <div>{props.path}</div>;
     };
 
-    if (getOperation(currentOperation)?.produces)
-        props.setContentType(getOperation(currentOperation)?.produces[0]);
+    useEffect(() => {
+        if (getOperation(initOperationName)?.produces)
+            props.setContentType(getOperation(initOperationName)?.produces[0]);
+
+        selectOperation(initOperationName);
+    }, [props.endpoint])
 
     return (
         <div>
             {!props.isSource && <FormGroup label="Operation">
-                <Dropdown
-                    type="text"
-                    id="simple-form-note-01"
-                    name="simple-form-number"
-                    value="disabled"
-                    dropdownItems={dropdownOperationItems}
-                    isOpen={isOpen}
-                    toggle={
-                        <DropdownToggle id="toggle-basic" onToggle={onToggle}>
-                            {currentOperation}
-                        </DropdownToggle>
-                    }
-                />
+                <FormSelect aria-label='OperationSelect' onChange={selectOperation} value={currentOperation}
+                            children={dropdownOperationItems}/>
             </FormGroup>}
             <FormGroup label="Produces">
-                {getOperation(currentOperation)?.produces.length}
                 <FormSelect aria-label='ContentTypeSelect' onChange={updateContentType} value={currentContentType}>
                     {producesOptions}
                 </FormSelect>
@@ -193,10 +172,6 @@ export const HttpEndpoint = (props: HttpEndpointProps) => {
                     <GridItem span={6}>Tags</GridItem>
                     <GridItem span={6}>
                         <Label>{getOperation(currentOperation)?.tags}</Label>
-                    </GridItem>
-                    <GridItem span={6}>Produces</GridItem>
-                    <GridItem span={6}>
-                        <div>{getOperation(currentOperation)?.produces}</div>
                     </GridItem>
                 </Grid>
             </FormGroup>
