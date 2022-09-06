@@ -14,16 +14,7 @@ import {
 } from '@patternfly/react-core';
 import {OpenAPI, OpenAPIV3, OpenAPIV2, OpenAPIV3_1} from 'openapi-types';
 import {ReactElement, useEffect, useRef, useState} from 'react';
-
-//TODO distinguish between source/sink type of extension
-
-const timeUnits: Map<string, number> = new Map<string, number>([
-    ['ms', 1],
-    ['s', 1000],
-    ['min', 1000 * 60],
-    ['hour', 1000 * 3600],
-    ['day', 1000 * 3600 * 24],
-])
+import {TimePeriodSelect, timeUnits} from "./TimePeriodSelect";
 
 export interface IEndpoint {
     name: string;
@@ -35,7 +26,7 @@ export interface IEndpoint {
     operations: Map<string, OpenAPI.Operation>;
 }
 
-async function parseApiSpec(input: string | OpenAPI.Document): Promise<IEndpoint[]> {
+async function parseApiSpec(input: string | OpenAPI.Document, isSource: boolean): Promise<IEndpoint[]> {
     let swaggerParser: SwaggerParser = new SwaggerParser();
 
     const e: Array<IEndpoint> = [];
@@ -44,7 +35,26 @@ async function parseApiSpec(input: string | OpenAPI.Document): Promise<IEndpoint
     try {
         api = await swaggerParser.validate(input, {dereference: {circular: 'ignore'}});
         // @ts-ignore
-        Object.entries(swaggerParser.api.paths).forEach((p) => e.push({name: p[0], pathItem: p[1]}));
+        Object.entries(swaggerParser.api.paths).forEach(p => {
+            const operations: Map<string, OpenAPI.Operation> = new Map<string, OpenAPI.Operation>();
+            let hasGet: boolean = false;
+            Object.entries(p[1]).forEach((method: [string, OpenAPI.Operation]) => {
+                if (!isSource) {
+                    operations.set(method[0], method[1]);
+                } else {
+                    if (method[0].toUpperCase() === 'GET')
+                        hasGet = true;
+                    operations.set(method[0], method[1]);
+                }
+            });
+            if (!isSource) {
+                e.push({name: p[0], pathItem: p[1], operations: operations});
+            } else {
+                if (hasGet) {
+                    e.push({name: p[0], pathItem: p[1], operations: operations});
+                }
+            }
+        });
     } catch (error) {
         console.error('error ' + error);
     }
@@ -61,6 +71,7 @@ const HttpStep = (props: any) => {
     let initPeriodINputValue = props.stepParams?.period;
     let initTimeUnit = 's';
 
+    //get init values for the TimePeriodSelect
     timeUnits.forEach((v, k) => {
         const period = props.stepParams?.period || 1;
         if (period / v >= 1 && period % v == 0) {
@@ -68,7 +79,6 @@ const HttpStep = (props: any) => {
             initTimeUnit = k;
         }
     })
-
 
     const [openApiSpecText, setOpenApiSpecText] = useState('');
     const endpoints = useRef<IEndpoint[]>([]);
@@ -88,11 +98,9 @@ const HttpStep = (props: any) => {
     })
     const [basePath, setBasePath] = useState<string>('');
     const [apiSpecUrl, setApiUrl] = useState<string>('https://api.chucknorris.io/documentation');
-    const [timeUnit, setTImeUnit] = useState<string>(initTimeUnit);
-    const [periodInputValue, setPeriodInputValue] = useState<number>(initPeriodINputValue);
 
     const parseSpec = async (input: string) => {
-        endpoints.current = await parseApiSpec(input);
+        endpoints.current = await parseApiSpec(input, isSource());
         setCurrentEndpoint(endpoints.current[0]);
     };
 
@@ -105,8 +113,8 @@ const HttpStep = (props: any) => {
     }, [openApiSpecText, upload]);
 
     function isSource(): boolean {
-        const name: string = props.step.name;
-        return name.includes('source');
+        const name: string = props.step?.name.toString();
+        return !name?.includes('source');
     }
 
     const handleFileInputChange = (
@@ -139,16 +147,21 @@ const HttpStep = (props: any) => {
 
     function setValue() {
         props.notifyKaoto(
-            'updating the step'
+            'Http step updated'
         );
-        props.updateStepParams(stepParams);
+        if (isSource()) {
+            props.updateStepParams(stepParams);
+            // if the step is either sink or action it doesn't have the period field
+        } else {
+            props.updateStepParams({url: stepParams.url, contentType: stepParams.contentType});
+        }
     }
 
     const handleLoadClick = () => {
         let url = new URL(apiSpecUrl);
-        setBasePath(url.origin);
         parseSpec(apiSpecUrl).catch(console.error);
-        constructUrl('');
+
+        constructUrl('',url.origin);
     };
 
     const constructUrl = (urParameters: string, bPath?: string) => {
@@ -163,21 +176,28 @@ const HttpStep = (props: any) => {
         setStepParams(stepParamsTemp);
     };
 
-    function setProduces(produces: string) {
-        const params = stepParams;
-        params.contentType = produces;
-        setStepParams(params);
+    function updatePeriod(period: number) {
+        setStepParams(prevState => ({
+            ...prevState,
+            period: period,
+        }));
     }
 
-    function calculateTime(unit: string) {
-        const params = stepParams;
-        const n = timeUnits.get(unit);
-        setTImeUnit(unit);
+    const setContentType = (produces: string) => {
+        //causes problems
+        setStepParams(prevState => ({
+            ...prevState,
+            contentType: produces
+        }));
+    }
 
-        if (n) {
-            params.period = periodInputValue * n;
-            setStepParams(params);
-        }
+    function updateStepParams(url: string, contentType: string, period: number) {
+        const newStepParams: HttpStepParams = {
+            period: (period > 0 ? period : stepParams.period),
+            url: (url !== '' ? url : stepParams.url),
+           contentType: (contentType!==''?contentType:stepParams.contentType),
+        };
+        setStepParams(newStepParams);
     }
 
     return (
@@ -235,41 +255,23 @@ const HttpStep = (props: any) => {
             </FormGroup>
             {currentEndpoint?.name !== '' && (
                 <HttpEndpoint
-                    endpointUrl={currentEndpoint.name}
                     endpoint={currentEndpoint}
+                    isSource={isSource()}
                     setUrl={constructUrl}
-                    setProduces={setProduces}
+                    setContentType={setContentType}
                 />
             )}
 
+            {isSource() &&
+                <TimePeriodSelect initTimeUnit={initTimeUnit} initPeriodInputValue={initPeriodINputValue}
+                                  setTimePeriod={updatePeriod}/>
+            }
 
-            <FormGroup label="Period">
-                <Grid>
-                    <GridItem span={4}>
-                        <TextInput value={periodInputValue} onChange={setPeriodInputValue} type="number"
-                                   aria-label="period"/>
-                    </GridItem>
-                    <GridItem span={8}>
-                        <FormSelect
-
-                            id="period-01"
-                            name="simple-form-number"
-                            value={timeUnit}
-                            onChange={calculateTime}>
-                            <FormSelectOption key='ms' value='ms' label='Miliseconds' isDisabled={false}/>
-                            <FormSelectOption key='s' value='s' label='Seconds' isDisabled={false}/>
-                            <FormSelectOption key='min' value='min' label='Minutes' isDisabled={false}/>
-                            <FormSelectOption key='hour' value='hour' label='Hours' isDisabled={false}/>
-                            <FormSelectOption key='day' value='day' label='Days' isDisabled={false}/>
-                        </FormSelect>
-                    </GridItem>
-                </Grid>
-            </FormGroup>
             <FormGroup label="URL">
                 <TextInput value={stepParams.url} isReadOnly aria-label="url-read-only"/>
             </FormGroup>
             <FormGroup label="Content Type">
-                <TextInput value={stepParams.contentType} isReadOnly aria-label="url-read-only"/>
+                <TextInput value={stepParams.contentType} aria-label="url-read-only"/>
             </FormGroup>
             <ActionGroup>
                 <Button variant="primary" onClick={setValue}>

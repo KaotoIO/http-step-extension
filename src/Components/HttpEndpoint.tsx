@@ -42,36 +42,32 @@ const ParamFields = ({parameters, handleChange}) => {
 
 export type HttpEndpointProps = {
     endpoint: IEndpoint;
-    endpointUrl: string;
+    isSource: boolean;
     setUrl: (value: string) => void;
-    setProduces: (value: string) => void;
+    setContentType: (value: string) => void;
 };
 
 export const HttpEndpoint = (props: HttpEndpointProps) => {
+    const [initMethod] = props.endpoint.operations.keys();
     const [isOpen, setIsOpen] = useState(false);
-    const [currentMethod, setCurrentMethod] = useState('');
+    const [currentOperation, setCurrentOperation] = useState(initMethod);
     const parameters = useRef<Map<string, string>>(new Map());
-    const methodsMap: Map<string, OpenAPI.Operation> = new Map<string, OpenAPI.Operation>();
-    // @ts-ignore
-    Object.entries(props.endpoint?.pathItem).forEach((method) => {
-        methodsMap.set(method[0], method[1]);
-    });
+    const [currentContentType, setCurrentContentType] = useState<string>('');
 
-    //let params = new Map();
-    if (methodsMap.size > 0) {
-        const [m] = methodsMap.keys();
-        if (currentMethod !== m) {
-            setCurrentMethod(m);
-        }
-        const params = getParameters(methodsMap.get(currentMethod));
-        const [existing] = parameters.current?.keys();
-        const [nw] = params.keys();
+    //init parameters
+    const params = getParameters(getOperation(currentOperation));
+    const [existing] = parameters.current?.keys();
+    const [nw] = params.keys();
 
-        if (parameters.current.size === 0 || nw !== existing) {
-            parameters.current = params;
-        }
+    if (parameters.current.size === 0 || nw !== existing) {
+        parameters.current = params;
     }
 
+    function getOperation(name: string) {
+        return props.endpoint.operations.get(name);
+    }
+
+  //  props.setUrl(props.endpoint.name);
     function getParameters(method?: OpenAPI.Operation): Map<string, string> {
         const parameters: Map<string, string> = new Map<string, string>();
         //
@@ -83,19 +79,18 @@ export const HttpEndpoint = (props: HttpEndpointProps) => {
 
     function getParameter(key: string): OpenAPI.Parameter {
         let found: OpenAPI.Parameter;
-        methodsMap.get(currentMethod)?.parameters?.forEach((v: OpenAPI.Parameter) => {
+        getOperation(currentOperation)?.parameters?.forEach((v: OpenAPI.Parameter) => {
             if (v.name.toString() === key) {
                 found = v;
             }
         });
-
         return found;
     }
 
     function selectMethod(name: string) {
-        const params: Map<string, string> = getParameters(methodsMap.get(name));
+        const params: Map<string, string> = getParameters(getOperation(name));
         parameters.current = new Map(params);
-        setCurrentMethod(name);
+        setCurrentOperation(name);
         setIsOpen(false);
     }
 
@@ -103,15 +98,14 @@ export const HttpEndpoint = (props: HttpEndpointProps) => {
         setIsOpen(isOpen);
     };
 
-    const dropdownMethodsItems: Array<ReactElement> = [];
-    methodsMap.forEach((v, method) => {
-        dropdownMethodsItems.push(
+    const dropdownOperationItems: Array<ReactElement> = [];
+    props.endpoint.operations.forEach((v, method) => {
+        dropdownOperationItems.push(
             <DropdownItem
                 key={method}
                 onClick={() => {
                     selectMethod(method);
-                }}
-            >
+                }}>
                 {method}
             </DropdownItem>
         );
@@ -120,7 +114,7 @@ export const HttpEndpoint = (props: HttpEndpointProps) => {
     const handleChange = (name: string, value: string) => {
         parameters.current.set(name, value);
 
-        let uri = props.endpointUrl;
+        let uri = props.endpoint.name;
         let p = '';
         parameters.current.forEach((val, key) => {
             if (val) {
@@ -139,36 +133,44 @@ export const HttpEndpoint = (props: HttpEndpointProps) => {
         props.setUrl(uri + p);
     };
 
+    const producesOptions: Array<ReactElement> = new Array<React.ReactElement>();
+    getOperation(currentOperation)?.produces.forEach((p) => {
+        producesOptions.push(<FormSelectOption key={p} label={p} value={p}/>);
+    })
+
+    const updateContentType = (value: string) => {
+        props.setContentType(value);
+        setCurrentContentType(value);
+    }
     type PathProperties = { path: string };
     const PathField = (props: PathProperties) => {
         return <div>{props.path}</div>;
     };
 
-    if (methodsMap.get(currentMethod)?.produces)
-        props.setProduces(methodsMap.get(currentMethod)?.produces[0]);
+    if (getOperation(currentOperation)?.produces)
+        props.setContentType(getOperation(currentOperation)?.produces[0]);
 
     return (
         <div>
-            <FormGroup label="Operation">
+            {!props.isSource && <FormGroup label="Operation">
                 <Dropdown
                     type="text"
                     id="simple-form-note-01"
                     name="simple-form-number"
                     value="disabled"
-                    dropdownItems={dropdownMethodsItems}
+                    dropdownItems={dropdownOperationItems}
                     isOpen={isOpen}
                     toggle={
                         <DropdownToggle id="toggle-basic" onToggle={onToggle}>
-                            {currentMethod}
+                            {currentOperation}
                         </DropdownToggle>
                     }
                 />
-            </FormGroup>
+            </FormGroup>}
             <FormGroup label="Produces">
-                <FormSelect>
-                    {methodsMap.get(currentMethod)?.produces.forEach((p) => {
-                        <FormSelectOption key='p' label={p} value={p}/>
-                    })}
+                {getOperation(currentOperation)?.produces.length}
+                <FormSelect aria-label='ContentTypeSelect' onChange={updateContentType} value={currentContentType}>
+                    {producesOptions}
                 </FormSelect>
             </FormGroup>
             <ParamFields parameters={parameters.current} handleChange={handleChange}/>
@@ -176,25 +178,25 @@ export const HttpEndpoint = (props: HttpEndpointProps) => {
                 <Grid>
                     <GridItem span={6}>Summary</GridItem>
                     <GridItem span={6}>
-                        <div>{methodsMap.get(currentMethod)?.summary}</div>
+                        <div>{getOperation(currentOperation)?.summary}</div>
                     </GridItem>
 
-                    {methodsMap.get(currentMethod)?.description && (
+                    {getOperation(currentOperation)?.description && (
                         <div>
                             <GridItem span={6}>Description</GridItem>
                             <GridItem span={6}>
-                                <div>{methodsMap.get(currentMethod)?.description}</div>
+                                <div>{getOperation(currentOperation)?.description}</div>
                             </GridItem>
                         </div>
                     )}
 
                     <GridItem span={6}>Tags</GridItem>
                     <GridItem span={6}>
-                        <Label>{methodsMap.get(currentMethod)?.tags}</Label>
+                        <Label>{getOperation(currentOperation)?.tags}</Label>
                     </GridItem>
                     <GridItem span={6}>Produces</GridItem>
                     <GridItem span={6}>
-                        <div>{methodsMap.get(currentMethod)?.produces}</div>
+                        <div>{getOperation(currentOperation)?.produces}</div>
                     </GridItem>
                 </Grid>
             </FormGroup>
