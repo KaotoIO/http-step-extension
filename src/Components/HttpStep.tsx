@@ -160,7 +160,7 @@ export const HttpStep = (props: any) => {
   }
 
   const handleLoadClick = () => {
-    let url = new URL(apiSpecUrl);
+    const url = new URL(apiSpecUrl);
     parseSpec(apiSpecUrl).catch(console.error);
     constructUrl('', url.origin);
   };
