@@ -3,7 +3,7 @@ const ModuleFederationPlugin = require('webpack').container.ModuleFederationPlug
 const DefinePlugin = require('webpack').DefinePlugin;
 const NodePolyfillPlugin = require('node-polyfill-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const { dependencies, peerDependencies } = require('./package.json');
+const { dependencies } = require('./package.json');
 const path = require('path');
 
 const isPatternflyStyles = (stylesheet) =>
@@ -13,7 +13,6 @@ const isPatternflyStyles = (stylesheet) =>
 module.exports = () => {
   return {
     entry: path.resolve(__dirname, 'src', 'index.tsx'),
-    mode: 'development',
     target: 'web',
     devtool: 'source-map',
     output: {
@@ -63,40 +62,38 @@ module.exports = () => {
         name: 'httpStep',
         filename: 'remoteEntry.js',
         exposes: {
-          './HttpStep': './src/HttpStep',
+          './HttpStep': './src/Components/HttpStep',
         },
         shared: {
           ...dependencies,
-          ...peerDependencies,
           react: {
             singleton: true,
-            requiredVersion: peerDependencies['react'],
+            requiredVersion: dependencies['react'],
           },
           'react-dom': {
             singleton: true,
-            requiredVersion: peerDependencies['react-dom'],
+            requiredVersion: dependencies['react-dom'],
           },
           'react-i18next': {
             singleton: true,
-            requiredVersion: peerDependencies['react-i18next'],
+            requiredVersion: dependencies['react-i18next'],
           },
           'react-router-dom': {
-            requiredVersion: peerDependencies['react-router-dom'],
+            requiredVersion: dependencies['react-router-dom'],
           },
           '@patternfly/patternfly/': {
             singleton: true,
-            requiredVersion: peerDependencies['@patternfly/patternfly'],
+            requiredVersion: dependencies['@patternfly/patternfly'],
           },
           '@patternfly/react-core/': {
             singleton: true,
-            requiredVersion: peerDependencies['@patternfly/react-core'],
+            requiredVersion: dependencies['@patternfly/react-core'],
           },
         },
       }),
       new NodePolyfillPlugin(),
       new DefinePlugin({
         browser: true,
-        'process.env.NODE_ENV': JSON.stringify('development'),
       }),
       new HtmlWebpackPlugin({
         favicon: path.resolve(__dirname, 'public', 'favicon.ico'),

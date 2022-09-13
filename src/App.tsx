@@ -1,4 +1,4 @@
-import HttpStep from './HttpStep';
+import { HttpStep } from './Components/HttpStep';
 import '@patternfly/patternfly/patternfly.css';
 import '@patternfly/patternfly/utilities/Accessibility/accessibility.css';
 import '@patternfly/patternfly/utilities/Display/display.css';
