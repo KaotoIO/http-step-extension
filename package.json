@@ -2,7 +2,7 @@
   "name": "http-step-extension",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://mmelko.github.io/http-step-extension",
+  "homepage": "https://kaotoio.github.io/http-step-extension",
   "port": "9001",
   "devDependencies": {
     "@babel/core": "7.15.5",
