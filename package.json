@@ -62,6 +62,7 @@
   "scripts": {
     "start:old": "webpack-cli serve",
     "start:dev": "webpack-cli serve --https --hot --color --progress --config webpack.dev.js",
+    "build": "webpack --mode production --config webpack.common.js",
     "start": "webpack-cli serve --hot --color --progress --config webpack.dev.js",
     "predeploy": "webpack --mode production --config webpack.common.js",
     "deploy": "gh-pages -d dist",
@@ -72,6 +73,12 @@
     "lint": "eslint --ext .ts,.tsx,.js ./src",
     "lint:fix": "yarn lint --fix",
     "lint-staged": "yarn lint:fix && yarn format:fix"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
   },
   "browserslist": {
     "production": [
